@@ -1,0 +1,26 @@
+
+> chatapp@0.1.0 dev
+> concurrently -n convex,next -c yellow,cyan "npm:convex:dev" "npm:next:dev"
+
+[convex] 
+[convex] > chatapp@0.1.0 convex:dev
+[convex] > convex dev
+[convex] 
+[next] 
+[next] > chatapp@0.1.0 next:dev
+[next] > next dev
+[next] 
+[next] ▲ Next.js 16.1.6 (Turbopack)
+[next] - Local:         http://localhost:3000
+[next] - Network:       http://192.168.1.111:3000
+[next] - Environments: .env.local
+[next] 
+[next] ✓ Starting...
+[next] ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+[next] ✓ Ready in 1462ms
+[next] ^C
+[convex] ^C
+[next] ^CTerminate batch job (Y/N)? 
+[convex] ^CTerminate batch job (Y/N)? 
+[next] npm run next:dev exited with code 3221225786
+[convex] npm run convex:dev exited with code 3221225786
