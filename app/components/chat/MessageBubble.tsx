@@ -11,6 +11,7 @@ export function MessageBubble({ content, isSender, timestamp }: MessageBubblePro
   const formatTime = (date: Date) => {
     const today = new Date();
     const isToday = date.toDateString() === today.toDateString();
+    const isSameYear = date.getFullYear() === today.getFullYear();
 
     if (isToday) {
       return date.toLocaleTimeString("en-US", {
@@ -20,9 +21,10 @@ export function MessageBubble({ content, isSender, timestamp }: MessageBubblePro
       });
     }
 
-    return date.toLocaleDateString("en-US", {
+    return date.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
+      ...(isSameYear ? {} : { year: "numeric" }),
       hour: "numeric",
       minute: "2-digit",
       hour12: true,

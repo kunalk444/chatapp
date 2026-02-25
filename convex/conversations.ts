@@ -47,22 +47,6 @@ export const getOrCreateDirectConversation = mutation({
         });
       }
 
-      const otherMembership = await ctx.db
-        .query("conversationParticipants")
-        .withIndex("by_conversationId_userId", (q) =>
-          q.eq("conversationId", existing._id).eq("userId", other),
-        )
-        .first();
-
-      if (!otherMembership) {
-        await ctx.db.insert("conversationParticipants", {
-          conversationId: existing._id,
-          userId: other,
-          unreadCount: 0,
-          lastReadAt: now,
-        });
-      }
-
       return existing._id;
     }
 
@@ -76,13 +60,6 @@ export const getOrCreateDirectConversation = mutation({
     await ctx.db.insert("conversationParticipants", {
       conversationId,
       userId: current,
-      unreadCount: 0,
-      lastReadAt: now,
-    });
-
-    await ctx.db.insert("conversationParticipants", {
-      conversationId,
-      userId: other,
       unreadCount: 0,
       lastReadAt: now,
     });
@@ -129,7 +106,7 @@ export const listConversations = query({
         lastMessage: conversation.lastMessageText || "No messages yet",
         lastMessageAt: conversation.lastMessageAt,
         unreadCount: membership.unreadCount,
-        isOnline: otherUser ? Date.now() - otherUser.lastSeen < 60_000 : false,
+        isOnline: otherUser ? Date.now() - otherUser.lastSeen < 20_000 : false,
       });
     }
 
@@ -205,15 +182,38 @@ export const sendMessage = mutation({
       .withIndex("by_conversationId", (q) => q.eq("conversationId", args.conversationId))
       .collect();
 
-    for (const membership of memberships) {
-      if (membership.userId === senderId) {
-        await ctx.db.patch(membership._id, {
-          unreadCount: 0,
-          lastReadAt: now,
-        });
-      } else {
+    const membershipByUserId = new Map(memberships.map((membership) => [membership.userId, membership]));
+
+    for (const participantId of conversation.participants) {
+      const membership = membershipByUserId.get(participantId);
+
+      if (participantId === senderId) {
+        if (membership) {
+          await ctx.db.patch(membership._id, {
+            unreadCount: 0,
+            lastReadAt: now,
+          });
+        } else {
+          await ctx.db.insert("conversationParticipants", {
+            conversationId: args.conversationId,
+            userId: participantId,
+            unreadCount: 0,
+            lastReadAt: now,
+          });
+        }
+        continue;
+      }
+
+      if (membership) {
         await ctx.db.patch(membership._id, {
           unreadCount: membership.unreadCount + 1,
+        });
+      } else {
+        await ctx.db.insert("conversationParticipants", {
+          conversationId: args.conversationId,
+          userId: participantId,
+          unreadCount: 1,
+          lastReadAt: 0,
         });
       }
     }

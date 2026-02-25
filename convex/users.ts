@@ -150,7 +150,14 @@ export const searchUsers = query({
             user.name.toLowerCase().includes(lowerQuery)
           );
         })
-        .slice(0, 10); // limit to 10 results
+        .slice(0, 10)
+        .map((user) => ({
+          clerkId: user.clerkId,
+          email: user.email,
+          name: user.name,
+          avatar: user.avatar,
+          isOnline: Date.now() - user.lastSeen < 20_000,
+        }));
     } catch (error) {
       console.error("❌ searchUsers query failed:", error);
       throw error;
@@ -224,7 +231,7 @@ export const searchUsersByEmail = query({
         email: user.email,
         name: user.name,
         avatar: user.avatar,
-        isOnline: Date.now() - user.lastSeen < 60000,
+        isOnline: Date.now() - user.lastSeen < 20_000,
       }));
   },
 });

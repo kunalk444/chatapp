@@ -17,6 +17,7 @@ export interface ChatMessage {
 interface ChatWindowProps {
   conversationId?: string;
   participantName?: string;
+  isParticipantOnline?: boolean;
   messages?: ChatMessage[];
   isLoading?: boolean;
   isTyping?: boolean;
@@ -41,6 +42,7 @@ function isMessage(value: unknown): value is ChatMessage {
 export function ChatWindow({
   conversationId,
   participantName = "Unknown",
+  isParticipantOnline = false,
   messages = [],
   isLoading = false,
   isTyping = false,
@@ -138,7 +140,7 @@ export function ChatWindow({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {onBack && (
-              <button onClick={onBack} className="rounded-lg border border-slate-200 bg-white p-2 lg:hidden">
+              <button onClick={onBack} className="rounded-lg border border-slate-200 bg-white p-2 md:hidden">
                 <ArrowLeft className="h-4 w-4 text-slate-700" />
               </button>
             )}
@@ -148,7 +150,9 @@ export function ChatWindow({
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 md:text-lg">{participantName}</h2>
-              <p className="text-xs text-emerald-600">Active now</p>
+              <p className={`text-xs ${isParticipantOnline ? "text-emerald-600" : "text-slate-500"}`}>
+                {isParticipantOnline ? "Active now" : "Offline"}
+              </p>
             </div>
           </div>
 
@@ -171,16 +175,18 @@ export function ChatWindow({
           <div className="flex h-full items-center justify-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-amber-200 border-t-amber-500" />
           </div>
-        ) : !canRenderMessages ? (
-          <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-            <p className="text-sm font-semibold text-slate-800">No messages yet</p>
-            <p className="text-xs text-slate-500">Start the conversation with a great first message.</p>
-          </div>
         ) : (
           <>
-            {validatedMessages.map((msg) => (
-              <MessageBubble key={msg.id} content={msg.content} isSender={msg.isSender} timestamp={msg.timestamp} />
-            ))}
+            {!canRenderMessages ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                <p className="text-sm font-semibold text-slate-800">No messages yet</p>
+                <p className="text-xs text-slate-500">Start the conversation with a great first message.</p>
+              </div>
+            ) : (
+              validatedMessages.map((msg) => (
+                <MessageBubble key={msg.id} content={msg.content} isSender={msg.isSender} timestamp={msg.timestamp} />
+              ))
+            )}
             {isTyping && <TypingIndicator label={typingText} />}
           </>
         )}

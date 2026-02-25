@@ -10,6 +10,8 @@ export default function ChatLayout({
   children: React.ReactNode;
 }) {
   const { user, isLoaded } = useUser();
+  const displayName =
+    user?.fullName || user?.firstName || user?.primaryEmailAddress?.emailAddress || "User";
 
   useUserSync();
 
@@ -39,7 +41,10 @@ export default function ChatLayout({
           <Link href="/" className="text-lg font-black text-slate-900">
             Chat
           </Link>
-          <UserButton />
+          <div className="flex items-center gap-3">
+            <p className="hidden text-sm font-medium text-slate-700 md:block">{displayName}</p>
+            <UserButton />
+          </div>
         </header>
         <main className="min-h-0 flex-1" role="main">
           {children}

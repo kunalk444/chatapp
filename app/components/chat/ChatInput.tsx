@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 
 interface ChatInputProps {
@@ -17,11 +17,33 @@ export function ChatInput({
   onStopTyping,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
+  const stopTypingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (stopTypingTimerRef.current) {
+        clearTimeout(stopTypingTimerRef.current);
+      }
+    };
+  }, []);
+
+  const scheduleStopTyping = () => {
+    if (stopTypingTimerRef.current) {
+      clearTimeout(stopTypingTimerRef.current);
+    }
+
+    stopTypingTimerRef.current = setTimeout(() => {
+      onStopTyping?.();
+    }, 2000);
+  };
 
   const handleSend = () => {
     if (!message.trim() || isLoading) return;
     onSend(message.trim());
     setMessage("");
+    if (stopTypingTimerRef.current) {
+      clearTimeout(stopTypingTimerRef.current);
+    }
     onStopTyping?.();
   };
 
@@ -39,11 +61,23 @@ export function ChatInput({
           <textarea
             value={message}
             onChange={(e) => {
-              setMessage(e.target.value);
+              const nextValue = e.target.value;
+              setMessage(nextValue);
+
+              if (!nextValue.trim()) {
+                if (stopTypingTimerRef.current) {
+                  clearTimeout(stopTypingTimerRef.current);
+                }
+                onStopTyping?.();
+                return;
+              }
+
               onTypingActivity?.();
+              scheduleStopTyping();
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Write something remarkable..."
+            onBlur={() => onStopTyping?.()}
+            placeholder="Start typing..."
             rows={1}
             className="max-h-28 flex-1 resize-none rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-200"
           />

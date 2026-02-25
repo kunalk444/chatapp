@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Search, Plus, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
@@ -42,7 +42,8 @@ export default function ChatPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
+  const [isDesktopView, setIsDesktopView] = useState(false);
   const [isStartingConversation, setIsStartingConversation] = useState(false);
   const searchDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastStartConversationAtRef = useRef(0);
@@ -55,10 +56,7 @@ export default function ChatPage() {
     user?.id ? { clerkId: user.id } : "skip",
   ) as ConversationItem[] | undefined;
 
-  const effectiveConversationId =
-    selectedConversationId || (conversations && conversations.length > 0
-      ? String(conversations[0].conversationId)
-      : undefined);
+  const effectiveConversationId = selectedConversationId;
 
   const messages = useQuery(
     api.conversations.getConversationMessages,
@@ -68,9 +66,9 @@ export default function ChatPage() {
   ) as MessageRow[] | undefined;
 
   const searchedMembers = useQuery(
-    api.users.searchUsersByEmail,
-    user?.id && debouncedSearchTerm.trim().length > 0
-      ? { clerkId: user.id, emailQuery: debouncedSearchTerm.trim() }
+    api.users.searchUsers,
+    user?.id && searchOpen
+      ? { clerkId: user.id, query: debouncedSearchTerm.trim() }
       : "skip",
   ) as MemberSearchResult[] | undefined;
 
@@ -117,6 +115,41 @@ export default function ChatPage() {
   }, [conversations, effectiveConversationId]);
 
   useEffect(() => {
+    if (!conversations) return;
+
+    if (!selectedConversationId) {
+      const firstConversationId = conversations[0] ? String(conversations[0].conversationId) : undefined;
+      if (firstConversationId) {
+        setSelectedConversationId(firstConversationId);
+      }
+      return;
+    }
+
+    const selectedStillExists = conversations.some(
+      (conversation) => String(conversation.conversationId) === selectedConversationId,
+    );
+
+    if (!selectedStillExists) {
+      const fallbackConversationId = conversations[0] ? String(conversations[0].conversationId) : undefined;
+      setSelectedConversationId(fallbackConversationId);
+    }
+  }, [conversations, selectedConversationId]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const syncViewport = (event?: MediaQueryListEvent) => {
+      setIsDesktopView(event ? event.matches : mediaQuery.matches);
+    };
+
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+
+    return () => {
+      mediaQuery.removeEventListener("change", syncViewport);
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (searchDebounceTimerRef.current) {
         clearTimeout(searchDebounceTimerRef.current);
@@ -126,6 +159,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!user?.id || !effectiveConversationId) return;
+    if (!isDesktopView && !isMobileChatOpen) return;
     const now = Date.now();
     if (now - lastMarkReadAtRef.current < 300) return;
     lastMarkReadAtRef.current = now;
@@ -134,12 +168,12 @@ export default function ChatPage() {
       conversationId: effectiveConversationId as Id<"conversations">,
       userId: user.id,
     });
-  }, [effectiveConversationId, messages?.length, markConversationRead, user?.id]);
+  }, [effectiveConversationId, isDesktopView, isMobileChatOpen, messages?.length, markConversationRead, user?.id]);
 
   const handleSelectConversation = (conversationId: string) => {
     setSelectedConversationId(conversationId);
     setSearchOpen(false);
-    setSidebarOpen(false);
+    setIsMobileChatOpen(true);
   };
 
   const handleStartConversation = async (member: MemberSearchResult) => {
@@ -164,6 +198,7 @@ export default function ChatPage() {
       setSearchTerm("");
       setDebouncedSearchTerm("");
       setSearchOpen(false);
+      setIsMobileChatOpen(true);
     } catch (error) {
       console.error("Failed to start conversation:", error);
     } finally {
@@ -253,19 +288,15 @@ export default function ChatPage() {
 
   return (
     <div className="relative flex h-full min-h-0">
-      <button
-        onClick={() => setSidebarOpen((prev) => !prev)}
-        className="absolute left-3 top-3 z-30 rounded-lg border border-slate-200 bg-white p-2 text-slate-700 shadow-sm md:hidden"
-        aria-label="Toggle conversation panel"
+      <aside
+        className={`min-h-0 w-full flex-col border-r border-slate-200 bg-white md:flex md:w-80 ${
+          isMobileChatOpen ? "hidden" : "flex"
+        }`}
       >
-        {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-      </button>
-
-      <aside className={`absolute inset-y-0 left-0 z-20 flex min-h-0 w-[86%] max-w-80 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:static md:w-80 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}`}>
         <div className="border-b border-slate-200 p-4">
           <div className="mb-3 flex items-center gap-2">
             <Search className="h-4 w-4 text-slate-400" />
-            <h2 className="text-sm font-bold text-slate-800">Add Member by Email</h2>
+            <h2 className="text-sm font-bold text-slate-800">Start Conversation by Name</h2>
           </div>
 
           <div className="relative">
@@ -290,14 +321,14 @@ export default function ChatPage() {
                 }, 300);
               }}
               onFocus={() => setSearchOpen(true)}
-              placeholder="Search email (e.g. alex@company.com)"
+              placeholder="Search name (e.g. Alex)"
               className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-amber-300 focus:outline-none"
             />
 
-            {searchOpen && debouncedSearchTerm.trim().length > 0 && (
+            {searchOpen && (
               <div className="absolute z-20 mt-2 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
                 {(searchedMembers || []).length === 0 ? (
-                  <div className="px-3 py-3 text-xs text-slate-500">No member found with that email.</div>
+                  <div className="px-3 py-3 text-xs text-slate-500">No member found with that name.</div>
                 ) : (
                   (searchedMembers || []).map((member) => (
                     <button
@@ -331,23 +362,11 @@ export default function ChatPage() {
         </div>
       </aside>
 
-      {sidebarOpen && (
-        <div
-          className="absolute inset-0 z-10 bg-black/20 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setSidebarOpen(false);
-          }}
-          aria-label="Close conversation panel"
-        />
-      )}
-
-      <section className="min-w-0 flex-1 bg-slate-50/60 md:bg-transparent">
+      <section className={`min-w-0 flex-1 bg-slate-50/60 md:block md:bg-transparent ${isMobileChatOpen ? "block" : "hidden"}`}>
         <ChatWindow
           conversationId={effectiveConversationId}
           participantName={selectedConversation?.participantName || "Select a conversation"}
+          isParticipantOnline={Boolean(selectedConversation?.isOnline)}
           messages={chatMessages}
           isLoading={effectiveConversationId ? messages === undefined : false}
           isTyping={Boolean(typingUsers && typingUsers.length > 0)}
@@ -355,6 +374,7 @@ export default function ChatPage() {
           onSendMessage={handleSendMessage}
           onTypingActivity={handleTypingActivity}
           onStopTyping={handleStopTyping}
+          onBack={() => setIsMobileChatOpen(false)}
         />
       </section>
     </div>

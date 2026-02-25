@@ -38,7 +38,21 @@ export function useUserSync() {
     };
 
     sync();
-    const interval = setInterval(sync, 30000);
-    return () => clearInterval(interval);
+
+    const interval = setInterval(sync, 10000);
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        void sync();
+      }
+    };
+
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+    };
   }, [isLoaded, user, syncUser]);
 }
